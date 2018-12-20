@@ -364,7 +364,7 @@ class RunFiles(Operator):
                     else:
                         context.space_data.text = bpy.data.texts[file.filename]
 
-                    bpy.ops.text.run_file()
+                    bpy.ops.text.run_script()
 
             if cur_block is not None:
                 context.space_data.text = cur_block
