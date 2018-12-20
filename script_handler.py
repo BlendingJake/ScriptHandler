@@ -47,8 +47,8 @@ class ScriptHandlerPanel(Panel):
         col.operator("ops.sh_move_project_down", text="", icon="TRIA_DOWN")
         col.operator("ops.sh_remove_project", text="", icon="X")
 
-        layout.operator("ops.sh_add_project")
-        layout.operator("ops.sh_rename_project")
+        layout.operator("ops.sh_add_project", icon="ADD")
+        layout.operator("ops.sh_rename_project", icon="CONSOLE")
         layout.prop(props, "new_project_name")
 
         if 0 <= props.project_index < len(props.projects):
@@ -66,19 +66,19 @@ class ScriptHandlerPanel(Panel):
             col.operator("ops.sh_move_file_down", text="", icon="TRIA_DOWN")
             col.operator("ops.sh_remove_file", text="", icon="X")
 
-            layout.operator("ops.sh_add_files")
+            layout.operator("ops.sh_add_files", icon="FILEBROWSER")
 
             layout.separator()
-            layout.operator("ops.sh_load_reload_files")
+            layout.operator("ops.sh_load_reload_files", icon="FILE_REFRESH")
 
             layout.separator()
-            layout.operator("ops.sh_run_files")
+            layout.operator("ops.sh_run_files", icon="PLAY")
 
             layout.separator()
-            layout.operator("ops.sh_save_project_files")
+            layout.operator("ops.sh_save_project_files", icon="WINDOW")
 
             layout.separator()
-            layout.operator("ops.sh_remove_project_files")
+            layout.operator("ops.sh_remove_project_files", icon="REMOVE")
 
 
 # ---------------------------------------------------------------------------------------------
