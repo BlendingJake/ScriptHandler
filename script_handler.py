@@ -9,16 +9,16 @@ from os import path
 # ---------------------------------------------------------------------------------------------
 # MISC FUNCTIONS
 # ---------------------------------------------------------------------------------------------
-def on_script_index_change(_, context):
+def on_file_index_change(_, context):
     props = context.scene.script_handler
 
     if props.projects:
         project = props.projects[props.project_index]
 
-        if project.scripts:
-            script = project.scripts[project.script_index]
+        if project.files:
+            file = project.files[project.file_index]
 
-            block = bpy.data.texts.get(script.filename, None)
+            block = bpy.data.texts.get(file.filename, None)
             if block is not None:
                 context.space_data.text = block
 
@@ -28,7 +28,7 @@ def on_script_index_change(_, context):
 # ---------------------------------------------------------------------------------------------
 class ScriptHandlerPanel(Panel):
     bl_idname = "OBJECT_PT_script_handler"
-    bl_label = "Script Handler"
+    bl_label = "ScriptHandler"
     bl_space_type = "TEXT_EDITOR"
     bl_region_type = "UI"
 
@@ -38,43 +38,47 @@ class ScriptHandlerPanel(Panel):
         props = scn.script_handler
 
         layout.label(text="Projects")
-        layout.template_list("OBJECT_UL_script_handler_projects", "", props, "projects", props, "project_index", rows=5)
 
-        box = layout.box()
+        row = layout.row()
+        row.template_list("OBJECT_UL_script_handler_projects", "", props, "projects", props, "project_index", rows=5)
 
-        box.operator("ops.sh_add_project")
-        box.operator("ops.sh_remove_project")
-        box.operator("ops.sh_rename_project")
-        box.prop(props, "new_project_name")
+        col = row.column()
+        col.operator("ops.sh_move_project_up", text="", icon="TRIA_UP")
+        col.operator("ops.sh_move_project_down", text="", icon="TRIA_DOWN")
+        col.operator("ops.sh_remove_project", text="", icon="X")
+
+        layout.operator("ops.sh_add_project")
+        layout.operator("ops.sh_rename_project")
+        layout.prop(props, "new_project_name")
 
         if 0 <= props.project_index < len(props.projects):
             layout.separator()
-            layout.label(text="Scripts")
+            layout.label(text="Files")
 
             project = props.projects[props.project_index]
 
             row = layout.row()
-            row.template_list("OBJECT_UL_script_handler_scripts", "", project, "scripts", project, "script_index",
-                              rows=5)
+            row.template_list("OBJECT_UL_script_handler_files", "", project, "files", project, "file_index",
+                              rows=7)
 
             col = row.column()
-            col.operator("ops.sh_move_script_up", text="", icon="TRIA_UP")
-            col.operator("ops.sh_move_script_down", text="", icon="TRIA_DOWN")
-            col.operator("ops.sh_remove_script", text="", icon="X")
+            col.operator("ops.sh_move_file_up", text="", icon="TRIA_UP")
+            col.operator("ops.sh_move_file_down", text="", icon="TRIA_DOWN")
+            col.operator("ops.sh_remove_file", text="", icon="X")
 
-            layout.operator("ops.sh_add_scripts")
-
-            layout.separator()
-            layout.operator("ops.sh_load_reload_scripts")
+            layout.operator("ops.sh_add_files")
 
             layout.separator()
-            layout.operator("ops.sh_run_scripts")
+            layout.operator("ops.sh_load_reload_files")
 
             layout.separator()
-            layout.operator("ops.sh_save_project_scripts")
+            layout.operator("ops.sh_run_files")
 
             layout.separator()
-            layout.operator("ops.sh_remove_project_scripts")
+            layout.operator("ops.sh_save_project_files")
+
+            layout.separator()
+            layout.operator("ops.sh_remove_project_files")
 
 
 # ---------------------------------------------------------------------------------------------
@@ -85,10 +89,10 @@ class OBJECT_UL_script_handler_projects(UIList):
         row = layout.row(align=True)
 
         row.label(text=item.name)
-        row.label(text="{} File(s)".format(len(item.scripts)))
+        row.label(text="{} File(s)".format(len(item.files)))
 
 
-class OBJECT_UL_script_handler_scripts(UIList):
+class OBJECT_UL_script_handler_files(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         row = layout.row(align=True)
 
@@ -97,7 +101,7 @@ class OBJECT_UL_script_handler_scripts(UIList):
 
 
 # ---------------------------------------------------------------------------------------------
-# OPERATORS
+# PROJECT OPERATORS
 # ---------------------------------------------------------------------------------------------
 class AddProject(Operator):
     bl_idname = "ops.sh_add_project"
@@ -113,6 +117,7 @@ class AddProject(Operator):
             if props.new_project_name not in project_names:
                 project = props.projects.add()
                 project.name = props.new_project_name
+                props.project_index = len(props.projects) - 1
             else:
                 self.report({"INFO"}, "A project already exists with the name {}".format(props.new_project_name))
 
@@ -128,8 +133,46 @@ class RemoveProject(Operator):
         props = context.scene.script_handler
 
         if props.projects:
+            # remove files
+            for file in props.projects[props.project_index].files:
+                block = bpy.data.texts.get(file.filename, None)
+
+                if block is not None:
+                    context.space_data.text = block
+                    bpy.ops.text.unlink()
+
             props.projects.remove(props.project_index)
             props.project_index = max(0, props.project_index - 1)
+
+        return {"FINISHED"}
+
+
+class MoveProjectUp(Operator):  # "UP" = closer to 0
+    bl_idname = "ops.sh_move_project_up"
+    bl_label = "Move Project Up"
+    bl_options = {"UNDO", "INTERNAL"}
+
+    def execute(self, context):
+        props = context.scene.script_handler
+
+        if props.project_index > 0:  # do we have room to move towards 0 by one unit?
+            props.projects.move(props.project_index, props.project_index-1)
+            props.project_index = max(0, props.project_index-1)
+
+        return {"FINISHED"}
+
+
+class MoveProjectDown(Operator):  # "DOWN" = closer to len(list)
+    bl_idname = "ops.sh_move_project_down"
+    bl_label = "Move Project Down"
+    bl_options = {"UNDO", "INTERNAL"}
+
+    def execute(self, context):
+        props = context.scene.script_handler
+
+        if props.project_index < len(props.projects):  # do we have room to move towards the end?
+            props.projects.move(props.project_index, props.project_index+1)
+            props.project_index = min(len(props.projects)-1, props.project_index+1)
 
         return {"FINISHED"}
 
@@ -153,12 +196,14 @@ class RenameProject(Operator):
         return {"FINISHED"}
 
 
-class AddScripts(Operator, ImportHelper):
-    bl_idname = "ops.sh_add_scripts"
-    bl_label = "Add Script(s)"
+# ---------------------------------------------------------------------------------------------
+# FILE OPERATORS
+# ---------------------------------------------------------------------------------------------
+class AddFiles(Operator, ImportHelper):
+    bl_idname = "ops.sh_add_files"
+    bl_label = "Add File(s)"
     bl_options = {"UNDO", "INTERNAL"}
 
-    filename_ext = ".py"
     files: CollectionProperty(type=OperatorFileListElement)
     directory: StringProperty(subtype="DIR_PATH")
 
@@ -168,17 +213,17 @@ class AddScripts(Operator, ImportHelper):
         if props.projects:
             project = props.projects[props.project_index]
 
-            project_scripts = set([x.filename for x in project.scripts])
-            loaded_scripts = set([x.name for x in bpy.data.texts])
+            project_files = set([x.filename for x in project.files])
+            loaded_files = set([x.name for x in bpy.data.texts])
 
             for file in self.files:
-                if file.name and file.name not in project_scripts:
-                    script = project.scripts.add()
-                    script.filepath = path.join(self.directory, file.name)
-                    script.filename = file.name
+                if file.name and file.name not in project_files:
+                    new_file = project.files.add()
+                    new_file.filepath = path.join(self.directory, file.name)
+                    new_file.filename = file.name
 
-                    if file.name not in loaded_scripts:
-                        bpy.ops.text.open(filepath=script.filepath)
+                    if file.name not in loaded_files:
+                        bpy.ops.text.open(filepath=new_file.filepath)
                     else:
                         self.report({"INFO"}, "The file named {} is already loaded".format(file.name))
                 else:
@@ -187,9 +232,9 @@ class AddScripts(Operator, ImportHelper):
         return {"FINISHED"}
 
 
-class RemoveScript(Operator):
-    bl_idname = "ops.sh_remove_script"
-    bl_label = "Remove Script"
+class RemoveFile(Operator):
+    bl_idname = "ops.sh_remove_file"
+    bl_label = "Remove File"
     bl_options = {"UNDO", "INTERNAL"}
 
     def execute(self, context):
@@ -198,21 +243,21 @@ class RemoveScript(Operator):
         if props.projects:
             project = props.projects[props.project_index]
 
-            if project.scripts:
-                block = bpy.data.texts.get(project.scripts[project.script_index].filename, None)
+            if project.files:
+                block = bpy.data.texts.get(project.files[project.file_index].filename, None)
                 if block is not None:
                     context.space_data.text = block
                     bpy.ops.text.unlink()
 
-                project.scripts.remove(project.script_index)
-                project.script_index = max(0, project.script_index - 1)
+                project.files.remove(project.file_index)
+                project.file_index = max(0, project.file_index - 1)
 
         return {"FINISHED"}
 
 
-class MoveScriptUp(Operator):  # "UP" = closer to 0
-    bl_idname = "ops.sh_move_script_up"
-    bl_label = "Move Script Up"
+class MoveFileUp(Operator):  # "UP" = closer to 0
+    bl_idname = "ops.sh_move_file_up"
+    bl_label = "Move File Up"
     bl_options = {"UNDO", "INTERNAL"}
 
     def execute(self, context):
@@ -221,16 +266,16 @@ class MoveScriptUp(Operator):  # "UP" = closer to 0
         if props.projects:
             project = props.projects[props.project_index]
 
-            if project.script_index > 0:  # do we have room to move towards 0 by one unit?
-                project.scripts.move(project.script_index, project.script_index-1)
-                project.script_index = max(0, project.script_index-1)
+            if project.file_index > 0:  # do we have room to move towards 0 by one unit?
+                project.files.move(project.file_index, project.file_index-1)
+                project.file_index = max(0, project.file_index-1)
 
         return {"FINISHED"}
 
 
-class MoveScriptDown(Operator):  # "DOWN" = closer to len(list)
-    bl_idname = "ops.sh_move_script_down"
-    bl_label = "Move Script Down"
+class MoveFileDown(Operator):  # "DOWN" = closer to len(list)
+    bl_idname = "ops.sh_move_file_down"
+    bl_label = "Move File Down"
     bl_options = {"UNDO", "INTERNAL"}
 
     def execute(self, context):
@@ -239,16 +284,16 @@ class MoveScriptDown(Operator):  # "DOWN" = closer to len(list)
         if props.projects:
             project = props.projects[props.project_index]
 
-            if project.script_index < len(project.scripts):  # do we have room to move towards the end?
-                project.scripts.move(project.script_index, project.script_index+1)
-                project.script_index = min(len(project.scripts)-1, project.script_index+1)
+            if project.file_index < len(project.files):  # do we have room to move towards the end?
+                project.files.move(project.file_index, project.file_index+1)
+                project.file_index = min(len(project.files)-1, project.file_index+1)
 
         return {"FINISHED"}
 
 
-class LoadReloadScripts(Operator):
-    bl_idname = "ops.sh_load_reload_scripts"
-    bl_label = "(Re)Load Scripts"
+class LoadReloadFiles(Operator):
+    bl_idname = "ops.sh_load_reload_files"
+    bl_label = "(Re)Load Files"
     bl_options = {"UNDO", "INTERNAL"}
 
     def execute(self, context):
@@ -257,25 +302,25 @@ class LoadReloadScripts(Operator):
         if props.projects:
             project = props.projects[props.project_index]
 
-            project_scripts = set()
-            for script in project.scripts:
-                project_scripts.add(script.filename)
+            project_files = set()
+            for file in project.files:
+                project_files.add(file.filename)
 
-                if script.filename in bpy.data.texts:
-                    context.space_data.text = bpy.data.texts[script.filename]
+                if file.filename in bpy.data.texts:
+                    context.space_data.text = bpy.data.texts[file.filename]
                     bpy.ops.text.reload()
                 else:
-                    bpy.ops.text.open(filepath=script.filepath)
+                    bpy.ops.text.open(filepath=file.filepath)
 
-            if project.scripts and project.scripts[project.script_index].filename in bpy.data.texts:
-                context.space_data.text = bpy.data.texts[project.scripts[project.script_index].filename]
+            if project.files and project.files[project.file_index].filename in bpy.data.texts:
+                context.space_data.text = bpy.data.texts[project.files[project.file_index].filename]
 
         return {"FINISHED"}
 
 
-class RunScripts(Operator):
-    bl_idname = "ops.sh_run_scripts"
-    bl_label = "Run Scripts"
+class RunFiles(Operator):
+    bl_idname = "ops.sh_run_files"
+    bl_label = "Run Files"
     bl_options = {"UNDO", "INTERNAL"}
 
     def execute(self, context):
@@ -285,14 +330,14 @@ class RunScripts(Operator):
             project = props.projects[props.project_index]
 
             cur_block = context.space_data.text
-            for script in project.scripts:
-                if script.runnable:
-                    if script.filename not in bpy.data.texts:  # load before running if needed
-                        bpy.ops.text.open(filepath=script.filepath)
+            for file in project.files:
+                if file.runnable:
+                    if file.filename not in bpy.data.texts:  # load before running if needed
+                        bpy.ops.text.open(filepath=file.filepath)
                     else:
-                        context.space_data.text = bpy.data.texts[script.filename]
+                        context.space_data.text = bpy.data.texts[file.filename]
 
-                    bpy.ops.text.run_script()
+                    bpy.ops.text.run_file()
 
             if cur_block is not None:
                 context.space_data.text = cur_block
@@ -300,9 +345,9 @@ class RunScripts(Operator):
         return {"FINISHED"}
 
 
-class SaveProjectScripts(Operator):
-    bl_idname = "ops.sh_save_project_scripts"
-    bl_label = "Save Project Scripts"
+class SaveProjectFiles(Operator):
+    bl_idname = "ops.sh_save_project_files"
+    bl_label = "Save Project Files"
     bl_options = {"UNDO", "INTERNAL"}
 
     def execute(self, context):
@@ -312,9 +357,9 @@ class SaveProjectScripts(Operator):
             project = props.projects[props.project_index]
 
             cur_block = context.space_data.text
-            for script in project.scripts:
-                if script.filename in bpy.data.texts:
-                    context.space_data.text = bpy.data.texts[script.filename]
+            for file in project.files:
+                if file.filename in bpy.data.texts:
+                    context.space_data.text = bpy.data.texts[file.filename]
                     bpy.ops.text.save()
 
             if cur_block is not None:
@@ -323,9 +368,9 @@ class SaveProjectScripts(Operator):
         return {"FINISHED"}
 
 
-class RemoveProjectScripts(Operator):
-    bl_idname = "ops.sh_remove_project_scripts"
-    bl_label = "Remove Project Scripts"
+class RemoveProjectFiles(Operator):
+    bl_idname = "ops.sh_remove_project_files"
+    bl_label = "Remove Project Files"
     bl_options = {"UNDO", "INTERNAL"}
 
     def execute(self, context):
@@ -334,9 +379,9 @@ class RemoveProjectScripts(Operator):
         if props.projects:
             project = props.projects[props.project_index]
 
-            for script in project.scripts:
-                if script.filename in bpy.data.texts:
-                    context.space_data.text = bpy.data.texts[script.filename]
+            for file in project.files:
+                if file.filename in bpy.data.texts:
+                    context.space_data.text = bpy.data.texts[file.filename]
                     bpy.ops.text.unlink()
 
         return {"FINISHED"}
@@ -345,7 +390,7 @@ class RemoveProjectScripts(Operator):
 # ---------------------------------------------------------------------------------------------
 # DATA STORAGE
 # ---------------------------------------------------------------------------------------------
-class ScriptProperties(PropertyGroup):
+class FileProperties(PropertyGroup):
     filename: StringProperty(name="Name")
     filepath: StringProperty(name="Path")
     runnable: BoolProperty(name="Runnable", default=False)
@@ -353,13 +398,13 @@ class ScriptProperties(PropertyGroup):
 
 class ProjectProperties(PropertyGroup):
     name: StringProperty(name="Name")
-    scripts: CollectionProperty(type=ScriptProperties)
-    script_index: IntProperty(update=on_script_index_change)
+    files: CollectionProperty(type=FileProperties)
+    file_index: IntProperty(update=on_file_index_change)
 
 
 class ScriptHandlerProperties(PropertyGroup):
     projects: CollectionProperty(type=ProjectProperties)
-    project_index: IntProperty(update=on_script_index_change)
+    project_index: IntProperty(update=on_file_index_change)
 
     new_project_name: StringProperty(name="Project Name")
 
@@ -368,25 +413,27 @@ classes = (  # order is important to avoid errors while registering
     AddProject,
     RemoveProject,
     RenameProject,
+    MoveProjectUp,
+    MoveProjectDown,
 
-    AddScripts,
-    RemoveScript,
+    AddFiles,
+    RemoveFile,
 
-    MoveScriptUp,
-    MoveScriptDown,
+    MoveFileUp,
+    MoveFileDown,
 
-    LoadReloadScripts,
-    RunScripts,
+    LoadReloadFiles,
+    RunFiles,
 
-    SaveProjectScripts,
-    RemoveProjectScripts,
+    SaveProjectFiles,
+    RemoveProjectFiles,
 
     ScriptHandlerPanel,
 
     OBJECT_UL_script_handler_projects,
-    OBJECT_UL_script_handler_scripts,
+    OBJECT_UL_script_handler_files,
 
-    ScriptProperties,
+    FileProperties,
     ProjectProperties,
     ScriptHandlerProperties
 )
