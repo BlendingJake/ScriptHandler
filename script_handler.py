@@ -5,6 +5,33 @@ import bpy
 from bpy_extras.io_utils import ImportHelper
 from os import path
 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# Original Author = Jacob Morris
+# Email Address = blendingjake@gmail.com
+
+bl_info = {
+    "name": "ScriptHandler",
+    "author": "Jacob Morris",
+    "version": (1, 0, 0),
+    "blender": (2, 80, 0),
+    "location": "Text Editor -> Properties -> MISC -> ScriptHandler",
+    "description": "Makes project and file handling easier in the text editor, and makes it simpler to reload" +
+                   " and run scripts",
+    "category": "Text Editor"
+}
+
 
 # ---------------------------------------------------------------------------------------------
 # MISC FUNCTIONS
